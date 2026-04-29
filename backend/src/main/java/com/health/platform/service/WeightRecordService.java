@@ -7,9 +7,12 @@ import com.health.platform.entity.User;
 import com.health.platform.entity.WeightRecord;
 import com.health.platform.repository.UserRepository;
 import com.health.platform.repository.WeightRecordRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -51,11 +54,27 @@ public class WeightRecordService {
     }
 
     @Transactional(readOnly = true)
-    public List<WeightRecordResponse> getAll() {
-        return weightRecordRepository.findByUserIdOrderByRecordDateDesc(DEFAULT_USER_ID)
-                .stream()
-                .map(WeightRecordResponse::from)
-                .toList();
+    public List<WeightRecordResponse> getAll(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "startDate must not be after endDate.");
+        }
+
+        List<WeightRecord> records;
+        if (startDate != null && endDate != null) {
+            records = weightRecordRepository
+                    .findByUserIdAndRecordDateBetweenOrderByRecordDateDesc(DEFAULT_USER_ID, startDate, endDate);
+        } else if (startDate != null) {
+            records = weightRecordRepository
+                    .findByUserIdAndRecordDateGreaterThanEqualOrderByRecordDateDesc(DEFAULT_USER_ID, startDate);
+        } else if (endDate != null) {
+            records = weightRecordRepository
+                    .findByUserIdAndRecordDateLessThanEqualOrderByRecordDateDesc(DEFAULT_USER_ID, endDate);
+        } else {
+            records = weightRecordRepository.findByUserIdOrderByRecordDateDesc(DEFAULT_USER_ID);
+        }
+
+        return records.stream().map(WeightRecordResponse::from).toList();
     }
 
     @Transactional

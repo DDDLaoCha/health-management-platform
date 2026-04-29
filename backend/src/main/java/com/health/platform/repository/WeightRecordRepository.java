@@ -11,4 +11,7 @@ import java.util.Optional;
 public interface WeightRecordRepository extends JpaRepository<WeightRecord, Long> {
     List<WeightRecord> findByUserIdOrderByRecordDateDesc(Long userId);
     Optional<WeightRecord> findByUserIdAndRecordDate(Long userId, LocalDate recordDate);
+    List<WeightRecord> findByUserIdAndRecordDateGreaterThanEqualOrderByRecordDateDesc(Long userId, LocalDate startDate);
+    List<WeightRecord> findByUserIdAndRecordDateLessThanEqualOrderByRecordDateDesc(Long userId, LocalDate endDate);
+    List<WeightRecord> findByUserIdAndRecordDateBetweenOrderByRecordDateDesc(Long userId, LocalDate startDate, LocalDate endDate);
 }
