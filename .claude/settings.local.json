@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"E:\\\\Program\\\\Health_management_platform\\\\backend\\\\src\\\\main\\\\java\\\\com\\\\health\\\\platform\\\\controller\")",
+      "Bash(mkdir -p \"E:\\\\Program\\\\Health_management_platform\\\\backend\\\\src\\\\main\\\\resources\")",
+      "Bash(mkdir -p \"E:\\\\Program\\\\Health_management_platform\\\\backend\\\\.mvn\\\\wrapper\")"
+    ]
+  }
+}
