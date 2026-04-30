@@ -3,6 +3,7 @@ package com.health.platform.service;
 import com.health.platform.dto.CreateWeightRecordRequest;
 import com.health.platform.dto.UpdateWeightRecordRequest;
 import com.health.platform.dto.WeightRecordResponse;
+import com.health.platform.dto.WeightSummaryResponse;
 import com.health.platform.entity.User;
 import com.health.platform.entity.WeightRecord;
 import com.health.platform.repository.UserRepository;
@@ -18,8 +19,6 @@ import java.util.List;
 @Service
 public class WeightRecordService {
 
-    private static final long DEFAULT_USER_ID = 1L;
-
     private final UserRepository userRepository;
     private final WeightRecordRepository weightRecordRepository;
 
@@ -30,18 +29,17 @@ public class WeightRecordService {
     }
 
     @Transactional
-    public WeightRecordResponse create(CreateWeightRecordRequest req) {
-        User user = userRepository.findById(DEFAULT_USER_ID)
+    public WeightRecordResponse create(Long userId, CreateWeightRecordRequest req) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalStateException(
-                        "User with id=" + DEFAULT_USER_ID + " not found. Please insert a seed user first."));
+                        "User with id=" + userId + " not found."));
 
         boolean exists = weightRecordRepository
-                .findByUserIdAndRecordDate(DEFAULT_USER_ID, req.getRecordDate())
+                .findByUserIdAndRecordDate(userId, req.getRecordDate())
                 .isPresent();
         if (exists) {
             throw new IllegalArgumentException(
-                    "A weight record for user_id=" + DEFAULT_USER_ID +
-                    " on " + req.getRecordDate() + " already exists.");
+                    "A weight record for " + req.getRecordDate() + " already exists.");
         }
 
         WeightRecord record = new WeightRecord();
@@ -54,7 +52,7 @@ public class WeightRecordService {
     }
 
     @Transactional(readOnly = true)
-    public List<WeightRecordResponse> getAll(LocalDate startDate, LocalDate endDate) {
+    public List<WeightRecordResponse> getAll(Long userId, LocalDate startDate, LocalDate endDate) {
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "startDate must not be after endDate.");
@@ -63,38 +61,37 @@ public class WeightRecordService {
         List<WeightRecord> records;
         if (startDate != null && endDate != null) {
             records = weightRecordRepository
-                    .findByUserIdAndRecordDateBetweenOrderByRecordDateDesc(DEFAULT_USER_ID, startDate, endDate);
+                    .findByUserIdAndRecordDateBetweenOrderByRecordDateAsc(userId, startDate, endDate);
         } else if (startDate != null) {
             records = weightRecordRepository
-                    .findByUserIdAndRecordDateGreaterThanEqualOrderByRecordDateDesc(DEFAULT_USER_ID, startDate);
+                    .findByUserIdAndRecordDateGreaterThanEqualOrderByRecordDateAsc(userId, startDate);
         } else if (endDate != null) {
             records = weightRecordRepository
-                    .findByUserIdAndRecordDateLessThanEqualOrderByRecordDateDesc(DEFAULT_USER_ID, endDate);
+                    .findByUserIdAndRecordDateLessThanEqualOrderByRecordDateAsc(userId, endDate);
         } else {
-            records = weightRecordRepository.findByUserIdOrderByRecordDateDesc(DEFAULT_USER_ID);
+            records = weightRecordRepository.findByUserIdOrderByRecordDateAsc(userId);
         }
 
         return records.stream().map(WeightRecordResponse::from).toList();
     }
 
     @Transactional
-    public WeightRecordResponse update(Long id, UpdateWeightRecordRequest req) {
+    public WeightRecordResponse update(Long userId, Long id, UpdateWeightRecordRequest req) {
         WeightRecord record = weightRecordRepository.findById(id)
                 .orElseThrow(() -> new IllegalStateException(
                         "Weight record with id=" + id + " not found."));
 
-        if (!record.getUser().getId().equals(DEFAULT_USER_ID)) {
+        if (!record.getUser().getId().equals(userId)) {
             throw new IllegalStateException(
                     "Weight record with id=" + id + " not found.");
         }
 
         if (!record.getRecordDate().equals(req.getRecordDate())) {
             weightRecordRepository
-                    .findByUserIdAndRecordDate(DEFAULT_USER_ID, req.getRecordDate())
+                    .findByUserIdAndRecordDate(userId, req.getRecordDate())
                     .ifPresent(conflict -> {
                         throw new IllegalArgumentException(
-                                "A weight record for user_id=" + DEFAULT_USER_ID +
-                                " on " + req.getRecordDate() + " already exists.");
+                                "A weight record for " + req.getRecordDate() + " already exists.");
                     });
         }
 
@@ -106,16 +103,26 @@ public class WeightRecordService {
     }
 
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long userId, Long id) {
         WeightRecord record = weightRecordRepository.findById(id)
                 .orElseThrow(() -> new IllegalStateException(
                         "Weight record with id=" + id + " not found."));
 
-        if (!record.getUser().getId().equals(DEFAULT_USER_ID)) {
+        if (!record.getUser().getId().equals(userId)) {
             throw new IllegalStateException(
                     "Weight record with id=" + id + " not found.");
         }
 
         weightRecordRepository.delete(record);
+    }
+
+    @Transactional(readOnly = true)
+    public WeightSummaryResponse getSummary(Long userId) {
+        var initial = weightRecordRepository.findFirstByUserIdOrderByRecordDateAsc(userId);
+        if (initial.isEmpty()) {
+            return WeightSummaryResponse.empty();
+        }
+        var latest = weightRecordRepository.findFirstByUserIdOrderByRecordDateDesc(userId).orElseThrow();
+        return WeightSummaryResponse.of(initial.get().getWeightKg(), latest.getWeightKg());
     }
 }
